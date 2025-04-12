@@ -53,7 +53,6 @@ edited_df = st.data_editor(
     key="cashflow_editor"
 )
 
-
 # 汇率获取函数（以 HKD 为基准）
 def get_hkd_rates():
     url = "https://api.exchangerate.host/latest?base=HKD"
@@ -83,36 +82,65 @@ else:
     hkd_to_usd = rates["HKD_USD"]
     hkd_to_chf = rates["HKD_CHF"]
 
-# 识别当前持仓（流出总股数）
-holdings = edited_df[edited_df["类型"] == "流出"]
-if not holdings.empty and all(col in holdings.columns for col in ["股数", "股票代码", "市场"]):
+# 💡 只自动计算金额或买入价格，不自动推导股数，并提示缺少股数
+for idx, row in edited_df.iterrows():
+    if pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]  # 自动补全总金额
+    elif pd.isna(row["买入价格"]):
+        if pd.notna(row["股数"]) and pd.notna(row["金额"]):
+            try:
+                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]  # 自动补全买入价格
+            except ZeroDivisionError:
+                pass
+
+# 检查是否有缺失股数的记录
+incomplete_rows = edited_df[(edited_df["类型"] == "流出") & ((edited_df["股数"].isna()) | (edited_df["股数"] == 0))]
+if not incomplete_rows.empty:
+    st.error("⚠️ 有投资记录缺少股数，请补全股数后再计算。")
+    st.stop()
+
+# 自动识别持仓并估值
+holdings = edited_df[(edited_df["类型"] == "流出") & (edited_df["股数"] > 0)]
+
+if not holdings.empty:
     grouped = holdings.groupby(["股票代码", "市场"])["股数"].sum().reset_index()
     st.markdown("---")
-    st.subheader("📘 当前持仓信息")
-    for _, row in grouped.iterrows():
-        st.markdown(f"- 股票：{row['股票代码']}（{row['市场']}），当前持仓约：{row['股数']} 股")
+    st.subheader("📘 当前持仓估值输入")
 
-    if "00700" in grouped["股票代码"].values:
-        tx_shares = float(grouped[grouped["股票代码"] == "00700"]["股数"].values[0])
-        st.markdown("---")
-        st.subheader("📈 实时市值输入：腾讯控股（00700.HK）")
-        tx_price = st.number_input("请输入当前每股价格（港币）", value=320.0)
-        market_value_hkd = tx_shares * tx_price
-        st.markdown(f"当前市值：{market_value_hkd:.2f} 港币 | 折合：RMB {market_value_hkd * hkd_to_rmb:.2f} | USD {market_value_hkd * hkd_to_usd:.2f} | CHF {market_value_hkd * hkd_to_chf:.2f}")
-        # 添加为今日现金流
-        edited_df = pd.concat([
-            edited_df,
-            pd.DataFrame.from_records([{
-                "日期": dt.date.today(),
-                "金额": market_value_hkd,
-                "币种": "HKD",
-                "类型": "流入",
-                "股票代码": "00700",
-                "市场": "港股",
-                "股数": tx_shares,
-                "买入价格": None
-            }])
-        ], ignore_index=True)
+    estimated_cashflows = []
+
+    for _, row in grouped.iterrows():
+        st.markdown(f"### 股票：{row['股票代码']}（{row['市场']}）")
+        shares = row["股数"]
+        current_price = st.number_input(f"当前价格（{row['市场']}，单位对应币种） - {row['股票代码']}", min_value=0.0, value=500.0)
+
+        # 根据市场自动判定估值货币
+        if row["市场"] == "港股":
+            fx = hkd_to_rmb
+            fx_usd = hkd_to_usd
+            fx_chf = hkd_to_chf
+            currency = "HKD"
+        else:
+            fx = 1.0  # 默认为人民币
+            fx_usd = 1.0
+            fx_chf = 1.0
+            currency = "RMB"
+
+        market_value = current_price * shares
+        estimated_cashflows.append({
+            "日期": dt.date.today(),
+            "金额": market_value,
+            "币种": currency,
+            "类型": "流入",
+            "股票代码": row["股票代码"],
+            "市场": row["市场"],
+            "股数": shares,
+            "买入价格": None
+        })
+
+    if estimated_cashflows:
+        edited_df = pd.concat([edited_df, pd.DataFrame(estimated_cashflows)], ignore_index=True)
 
 # 汇率换算 + MWR 计算函数
 def calculate_xirr(cash_flows):
@@ -127,7 +155,6 @@ def calculate_xirr(cash_flows):
             high = mid
     return mid
 
-# MWR计算入口
 if st.button("📊 计算 MWR（按不同币种）"):
     try:
         def convert(df, to_currency):
