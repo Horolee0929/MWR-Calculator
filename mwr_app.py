@@ -29,7 +29,7 @@ def get_empty_df():
         "股票代码": pd.Series(dtype="str"),
         "市场": pd.Series(dtype="str"),
         "股数": pd.Series(dtype="float"),
-        "买入价格": pd.Series(dtype="float")
+        "价格": pd.Series(dtype="float")
     })
 
 if "cashflow_df" not in st.session_state:
@@ -40,7 +40,7 @@ edited_df = st.data_editor(
     num_rows="dynamic",
     use_container_width=True,
     column_config={
-        "买卖方向": st.column_config.SelectboxColumn(options=["买入", "卖出", "", None]),
+        "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
         "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "金额": st.column_config.NumberColumn(format="%.2f"),
         "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
@@ -48,43 +48,33 @@ edited_df = st.data_editor(
         "股票代码": st.column_config.TextColumn(),
         "市场": st.column_config.SelectboxColumn(options=["港股", "美股", "A股", "其他"]),
         "股数": st.column_config.NumberColumn(format="%.2f"),
-        "买入价格": st.column_config.NumberColumn(format="%.2f"),
+        "价格": st.column_config.NumberColumn(format="%.2f"),
     },
     key="cashflow_editor"
 )
 
-# 汇率部分
-@st.cache_data
-def get_hkd_rates():
-    url = "https://api.exchangerate.host/latest?base=HKD"
-    try:
-        r = requests.get(url, timeout=5)
-        r.raise_for_status()
-        data = r.json()
-        if "rates" in data:
-            return {
-                "HKD_RMB": data["rates"].get("CNY", None),
-                "HKD_CHF": data["rates"].get("CHF", None),
-                "HKD_USD": data["rates"].get("USD", None)
-            }
-    except Exception as e:
-        st.warning(f"⚠️ 无法获取实时汇率数据，请手动输入。原因：{e}")
-        return None
 
-rates = get_hkd_rates()
-
-if rates is None or any(v is None for v in rates.values()):
-    st.error("请手动输入当前汇率：")
-    hkd_to_rmb = st.number_input("HKD兑RMB：", value=0.88, step=0.01)
-    hkd_to_usd = st.number_input("HKD兑USD：", value=0.128, step=0.001)
-    hkd_to_chf = st.number_input("HKD兑CHF：", value=0.114, step=0.001)
-else:
     hkd_to_rmb = rates["HKD_RMB"]
     hkd_to_usd = rates["HKD_USD"]
     hkd_to_chf = rates["HKD_CHF"]
 
 # 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
 for idx, row in edited_df.iterrows():
+    if row["类型"] in 类型映射:
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+
+    # 自动填写金额（买入或卖出）
+    if pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["价格"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
+
+    # 自动填写买入价格（当金额已知）
+    elif pd.isna(row["买入价格"]):
+        if pd.notna(row["股数"]) and pd.notna(row["金额"]):
+            try:
+                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
+            except ZeroDivisionError:
+                pass
     if row["类型"] in 类型映射:
         edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
 
@@ -203,7 +193,7 @@ if not holdings.empty:
             "股票代码": stock_code,
             "市场": market,
             "股数": shares,
-            "买入价格": None
+            "价格": None
         })
 
     if estimated_cashflows:
@@ -247,33 +237,18 @@ summary_df = summary_df.sort_values("日期")
 st.dataframe(summary_df, use_container_width=True)
 
 # 计算入口
-if st.button("📊 计算 MWR（按不同币种）"):
-    mwr_results = {}
+if st.button("📊 计算 MWR（单一币种）"):
     try:
-        def convert(df, to_currency):
-            rate_map = {"RMB": 1.0, "HKD": hkd_to_rmb, "USD": hkd_to_usd, "CHF": hkd_to_chf}
-            return df.apply(
-                lambda row: row["金额"] * rate_map.get(row["币种"], 1.0)
-                if to_currency == "RMB" else
-                row["金额"] * (rate_map.get(row["币种"], 1.0) / rate_map[to_currency]), axis=1)
-
-        for ccy in ["RMB", "USD", "CHF"]:
-            cf_df = edited_df.copy()
-            cf_df["金额转换"] = convert(cf_df, ccy)
-            cf_df_sorted = cf_df.sort_values("日期")
-            cash_flows = []
-            for _, row in cf_df_sorted.iterrows():
-                amt = abs(row["金额转换"]) if row["逻辑类型"] == "流入" else -abs(row["金额转换"])
-                cash_flows.append((row["日期"], amt))
-            result = calculate_xirr(cash_flows)
-            mwr_results[ccy] = result
-            with st.expander(f"{ccy} 计价 MWR 计算明细"):
-                st.dataframe(cf_df_sorted[["日期", "金额", "币种", "类型", "股票代码", "市场", "金额转换"]], use_container_width=True)
-                st.success(f"📈 MWR（{ccy}）年化收益率：{result:.2%}")
+        cf_df = edited_df.copy()
+        cf_df_sorted = cf_df.sort_values("日期")
+        cash_flows = []
+        for _, row in cf_df_sorted.iterrows():
+            amt = abs(row["金额"]) if row["逻辑类型"] == "流入" else -abs(row["金额"])
+            cash_flows.append((row["日期"], amt))
+        result = calculate_xirr(cash_flows)
+        st.subheader("📈 MWR（原币计）年化收益率")
+        st.success(f"💹 年化收益率：{result:.2%}")
+        with st.expander("📋 现金流明细"):
+            st.dataframe(cf_df_sorted[["日期", "金额", "币种", "类型", "股票代码", "市场"]], use_container_width=True)
     except Exception as e:
-        st.error(f"计算出错：{e}")
-
-    st.markdown("---")
-    st.subheader("📈 汇总：各币种计价 MWR")
-    for ccy, res in mwr_results.items():
-        st.write(f"**{ccy}：{res:.2%}**")
+        st.error(f"计算出错：{e}")       st.write(f"**{ccy}：{res:.2%}**")
