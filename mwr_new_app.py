@@ -73,10 +73,10 @@ def update_cashflow_df(df):
                     df.at[idx, "汇率"] = rate
 
         # 自动补金额
-        if pd.isna(row["金额"]):
-            if pd.notna(row["价格"]) and pd.notna(row["股数"]) and pd.notna(row["汇率"]):
-                df.at[idx, "金额"] = row["价格"] * row["股数"] * row["汇率"]
-    return df
+        if pd.notna(row["价格"]) and pd.notna(row["股数"]) and pd.notna(row["汇率"]):
+            df.at[idx, "金额"] = row["价格"] * row["股数"] * row["汇率"]
+    return df        
+   
     
     
 
