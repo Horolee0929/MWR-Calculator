@@ -200,7 +200,7 @@ if not edited_df.empty:
             ccy = row["币种"]
             return f"previous close price ({ccy})"
 
-                stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
+        stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
         stock_summary["持有资产价值"] = stock_summary["当前持仓"] * stock_summary["previous close price"]
 
         def add_currency_suffix(value, currency):
