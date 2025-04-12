@@ -53,25 +53,35 @@ edited_df = st.data_editor(
     key="cashflow_editor"
 )
 
-# 汇率获取函数（以 HKD 为基准）
-@st.cache_data
 
+# 汇率获取函数（以 HKD 为基准）
 def get_hkd_rates():
     url = "https://api.exchangerate.host/latest?base=HKD"
-    r = requests.get(url)
-    if r.status_code == 200:
+    try:
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
         data = r.json()
-        return {
-            "HKD_RMB": data["rates"].get("CNY", 0.88),
-            "HKD_CHF": data["rates"].get("CHF", 0.114),
-            "HKD_USD": data["rates"].get("USD", 0.128)
-        }
-    return {"HKD_RMB": 0.88, "HKD_CHF": 0.114, "HKD_USD": 0.128}
+        if "rates" in data:
+            return {
+                "HKD_RMB": data["rates"].get("CNY", None),
+                "HKD_CHF": data["rates"].get("CHF", None),
+                "HKD_USD": data["rates"].get("USD", None)
+            }
+    except Exception as e:
+        st.warning(f"⚠️ 无法获取实时汇率数据，请手动输入。原因：{e}")
+        return None
 
 rates = get_hkd_rates()
-hkd_to_rmb = rates["HKD_RMB"]
-hkd_to_chf = rates["HKD_CHF"]
-hkd_to_usd = rates["HKD_USD"]
+
+if rates is None or any(v is None for v in rates.values()):
+    st.error("请手动输入当前汇率：")
+    hkd_to_rmb = st.number_input("HKD兑RMB：", value=0.88, step=0.01)
+    hkd_to_usd = st.number_input("HKD兑USD：", value=0.128, step=0.001)
+    hkd_to_chf = st.number_input("HKD兑CHF：", value=0.114, step=0.001)
+else:
+    hkd_to_rmb = rates["HKD_RMB"]
+    hkd_to_usd = rates["HKD_USD"]
+    hkd_to_chf = rates["HKD_CHF"]
 
 # 识别当前持仓（流出总股数）
 holdings = edited_df[edited_df["类型"] == "流出"]
