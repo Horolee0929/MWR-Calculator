@@ -49,24 +49,17 @@ if "cashflow_df" not in st.session_state:
 
 edited_df = st.session_state.cashflow_df.copy()
 
-# 自动补汇率 和计算金额
-edited_df = st.session_state.cashflow_df.copy()
+# 自动补汇率和金额（无须按钮）
+for idx, row in edited_df.iterrows():
+    if pd.notna(row["日期"]) and pd.notna(row["币种"]) and pd.notna(row["目标币种"]):
+        if pd.isna(row["汇率"]):
+            rate = get_historical_rate(str(row["日期"].date()), row["币种"], row["目标币种"])
+            if rate is not None:
+                edited_df.at[idx, "汇率"] = rate
 
-if st.button("🔄 更新汇率和金额"):
-    for idx, row in edited_df.iterrows():
-        if pd.notna(row["日期"]) and pd.notna(row["币种"]) and pd.notna(row["目标币种"]):
-            if pd.isna(row["汇率"]):
-                rate = get_historical_rate(str(row["日期"].date()), row["币种"], row["目标币种"])
-                if rate is not None:
-                    edited_df.at[idx, "汇率"] = rate
-                else:
-                    st.warning(f"⚠️ 无法获取 {row['日期'].date()} 从 {row['币种']} 到 {row['目标币种']} 的汇率，请手动输入。")
-
-    for idx, row in edited_df.iterrows():
+    if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
-
-    st.success("✅ 汇率和金额已更新")
     edited_df = st.session_state.cashflow_df.copy()
 
 # 显示表格并可编辑除了金额列
