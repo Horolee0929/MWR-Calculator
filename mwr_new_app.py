@@ -14,8 +14,11 @@ def get_historical_rate(date_str, base_currency, target_currency):
         response.raise_for_status()
         data = response.json()
         return data["rates"].get(target_currency, None)
-    except:
-        return None
+    except Exception as e:
+        st.warning(f"无法获取 {date_str} 的 {base_currency} → {target_currency} 汇率，请手动输入。错误: {e}")
+    return None
+
+    
 
 st.set_page_config(page_title="MWR计算器", layout="centered")
 
@@ -60,7 +63,7 @@ for idx, row in edited_df.iterrows():
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
-    edited_df = st.session_state.cashflow_df.copy()
+  
 
 # 显示表格并可编辑除了金额列
 st.data_editor(
