@@ -197,8 +197,8 @@ if not edited_df.empty:
             if row.get("股票代码") and row.get("市场")
         } if "estimated_cashflows" in locals() else {}
         def get_price_label(row):
-    ccy = row["币种"]
-    return f"previous close price ({ccy})"
+            ccy = row["币种"]
+            return f"previous close price ({ccy})"
 
 stock_summary["价格列名"] = stock_summary.apply(get_price_label, axis=1)
 stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
