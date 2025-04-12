@@ -157,7 +157,7 @@ if not holdings.empty:
             "股票代码": stock_code,
             "市场": market,
             "股数": shares,
-            价格": final_price  
+            "价格": final_price  
         })
 
     if estimated_cashflows:
