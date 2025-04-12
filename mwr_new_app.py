@@ -60,7 +60,7 @@ edited_df = st.data_editor(
         "股票代码": st.column_config.TextColumn(),
         "股数": st.column_config.NumberColumn(format="%.2f"),
         "价格": st.column_config.NumberColumn(format="%.2f"),
-        "汇率": st.column_config.NumberColumn(format="%.4f")
+        "汇率": st.column_config.NumberColumn(format="%.4f", disabled=True)
     },
     key="cashflow_editor"
 )
@@ -80,3 +80,16 @@ for idx, row in edited_df.iterrows():
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
+
+# 确保“市场”字段不会再出现在表格中
+if "市场" in edited_df.columns:
+    edited_df.drop(columns=["市场"], inplace=True)
+
+# 显示编辑后的表格内容供用户确认
+st.subheader("📋 投资记录明细（金额按目标币种自动换算）")
+st.dataframe(edited_df, use_container_width=True)
+
+# 同步回 session_state 以保存自动更新的内容
+st.session_state.cashflow_df = edited_df
+
+# 可以在此处继续添加计算 MWR 的逻辑和结果展示
