@@ -33,15 +33,15 @@ st.markdown("""
 @st.cache_data
 def get_empty_df():
     return pd.DataFrame({
-        "买卖方向": pd.Series(dtype="str"),
         "日期": pd.Series(dtype="datetime64[ns]"),
-        "金额": pd.Series(dtype="float"),
-        "币种": pd.Series(dtype="str"),
+        "买卖方向": pd.Series(dtype="str"),
         "股票代码": pd.Series(dtype="str"),
-        "股数": pd.Series(dtype="float"),
+        "币种": pd.Series(dtype="str"),
         "价格": pd.Series(dtype="float"),
+        "股数": pd.Series(dtype="float"),
         "汇率": pd.Series(dtype="float"),
         "目标币种": pd.Series(dtype="str")
+        "金额": pd.Series(dtype="float"),
     })
 
 if "cashflow_df" not in st.session_state:
@@ -72,15 +72,15 @@ st.data_editor(
     use_container_width=True,
     key="cashflow_editor",
     column_config={
-        "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
         "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
-        "金额": st.column_config.NumberColumn(format="%.2f"),
-        "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
-        "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
+        "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
         "股票代码": st.column_config.TextColumn(),
-        "股数": st.column_config.NumberColumn(format="%.2f"),
+        "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
         "价格": st.column_config.NumberColumn(format="%.2f"),
+        "股数": st.column_config.NumberColumn(format="%.2f"),
         "汇率": st.column_config.NumberColumn(format="%.4f")
+        "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
+        "金额": st.column_config.NumberColumn(format="%.2f"),
     }
 )
 
