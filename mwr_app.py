@@ -182,7 +182,7 @@ def calculate_xirr(cash_flows):
 # 🧮 自动计算当前持仓股数 × 当前输入价格
 if not edited_df.empty:
     net_positions = edited_df.copy()
-     net_positions = net_positions[~(
+    net_positions = net_positions[~(
         (net_positions["买卖方向"] == "卖出股票") &
         (net_positions["金额"].notna()) &
         (net_positions["日期"] == dt.date.today())
