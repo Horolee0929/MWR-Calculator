@@ -182,16 +182,10 @@ def calculate_xirr(cash_flows):
 # 🧮 自动计算当前持仓股数 × 当前输入价格
 if not edited_df.empty:
     net_positions = edited_df.copy()
-    net_positions = net_positions[~(
-        (net_positions["买卖方向"] == "卖出股票") &
-        (net_positions["金额"].notna()) &
-        (net_positions["日期"] == dt.date.today())
-    )]
+    net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
     net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
     stock_summary = net_positions.groupby(["股票代码", "市场", "币种"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
-    
-
 
     st.markdown("---")
     st.subheader("📦 当前股票净持仓（含 previous close price 和持有资产价值）")
@@ -206,18 +200,20 @@ if not edited_df.empty:
             ccy = row["币种"]
             return f"previous close price ({ccy})"
 
-        stock_summary["价格列名"] = stock_summary.apply(get_price_label, axis=1)
-        stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
+                stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
         stock_summary["持有资产价值"] = stock_summary["当前持仓"] * stock_summary["previous close price"]
-        stock_summary["持有资产价值列名"] = stock_summary["价格列名"].str.replace("previous close price", "持有资产价值")
-        display_df = stock_summary[["股票代码", "市场", "当前持仓", "previous close price", "持有资产价值"]].copy()
-        display_df.columns = ["股票代码", "市场", "当前持仓", stock_summary["价格列名"].iloc[0], stock_summary["持有资产价值列名"].iloc[0]]
 
+        def add_currency_suffix(value, currency):
+            return f"{value:.2f} {currency}" if pd.notna(value) else "-"
+
+        stock_summary["previous close price"] = stock_summary.apply(lambda x: add_currency_suffix(x["previous close price"], x["币种"]), axis=1)
+        stock_summary["持有资产价值"] = stock_summary.apply(lambda x: add_currency_suffix(x["持有资产价值"], x["币种"]), axis=1)
+
+        display_df = stock_summary[["股票代码", "市场", "币种", "当前持仓", "previous close price", "持有资产价值"]].copy()
+        display_df.columns = ["股票代码", "市场", "币种", "当前持仓", "previous close price", "持有资产价值"]
         st.dataframe(display_df, use_container_width=True)
     else:
         st.info("当前没有任何持仓。")
-
-
 st.markdown("---")
 st.subheader("📊 投资现金流汇总")
 
