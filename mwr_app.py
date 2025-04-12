@@ -54,9 +54,6 @@ edited_df = st.data_editor(
 )
 
 
-    hkd_to_rmb = rates["HKD_RMB"]
-    hkd_to_usd = rates["HKD_USD"]
-    hkd_to_chf = rates["HKD_CHF"]
 
 # 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
 for idx, row in edited_df.iterrows():
@@ -237,18 +234,26 @@ summary_df = summary_df.sort_values("日期")
 st.dataframe(summary_df, use_container_width=True)
 
 # 计算入口
-if st.button("📊 计算 MWR（单一币种）"):
+if st.button("📊 计算 MWR（多币种分别计算）"):
     try:
         cf_df = edited_df.copy()
         cf_df_sorted = cf_df.sort_values("日期")
-        cash_flows = []
-        for _, row in cf_df_sorted.iterrows():
-            amt = abs(row["金额"]) if row["逻辑类型"] == "流入" else -abs(row["金额"])
-            cash_flows.append((row["日期"], amt))
-        result = calculate_xirr(cash_flows)
-        st.subheader("📈 MWR（原币计）年化收益率")
-        st.success(f"💹 年化收益率：{result:.2%}")
-        with st.expander("📋 现金流明细"):
-            st.dataframe(cf_df_sorted[["日期", "金额", "币种", "类型", "股票代码", "市场"]], use_container_width=True)
+        currency_groups = cf_df_sorted.groupby("币种")
+
+        st.subheader("📈 各币种计价的 MWR 年化收益率")
+        for currency, group in currency_groups:
+            group = group.copy()
+            cash_flows = []
+            for _, row in group.iterrows():
+                amt = abs(row["金额"]) if row["逻辑类型"] == "流入" else -abs(row["金额"])
+                cash_flows.append((row["日期"], amt))
+            try:
+                result = calculate_xirr(cash_flows)
+                st.markdown(f"**{currency}：{result:.2%}**")
+                with st.expander(f"📋 {currency} 现金流明细"):
+                    st.dataframe(group[["日期", "金额", "币种", "类型", "股票代码", "市场"]], use_container_width=True)
+            except Exception as calc_error:
+                st.warning(f"{currency} 计算失败：{calc_error}")
+
     except Exception as e:
-        st.error(f"计算出错：{e}")       st.write(f"**{ccy}：{res:.2%}**")
+        st.error(f"计算出错：{e}")
