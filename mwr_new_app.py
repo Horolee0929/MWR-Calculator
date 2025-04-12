@@ -38,7 +38,6 @@ def get_empty_df():
         "金额": pd.Series(dtype="float"),
         "币种": pd.Series(dtype="str"),
         "股票代码": pd.Series(dtype="str"),
-        "市场": pd.Series(dtype="str"),
         "股数": pd.Series(dtype="float"),
         "价格": pd.Series(dtype="float"),
         "汇率": pd.Series(dtype="float"),
@@ -59,7 +58,6 @@ edited_df = st.data_editor(
         "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
         "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
         "股票代码": st.column_config.TextColumn(),
-        "市场": st.column_config.SelectboxColumn(options=["港股", "美股", "A股", "其他"]),
         "股数": st.column_config.NumberColumn(format="%.2f"),
         "价格": st.column_config.NumberColumn(format="%.2f"),
         "汇率": st.column_config.NumberColumn(format="%.4f")
@@ -76,3 +74,11 @@ for idx, row in edited_df.iterrows():
                 edited_df.at[idx, "汇率"] = rate
             else:
                 st.warning(f"⚠️ 无法获取 {row['日期'].date()} 从 {row['币种']} 到 {row['目标币种']} 的汇率，请手动输入。")
+
+# 自动计算金额（以目标币种为计价）
+for idx, row in edited_df.iterrows():
+    if pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
+
+# 剩余原逻辑保持不变，可在之后继续处理 edited_df 内容
