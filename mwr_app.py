@@ -179,11 +179,15 @@ if not edited_df.empty:
     net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
     net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
-    stock_summary = net_positions.groupby(["股票代码", "市场"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
+    stock_summary = net_positions.groupby(["股票代码", "市场", "币种"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
 
     st.markdown("---")
     st.subheader("📦 当前股票净持仓")
     if not stock_summary.empty:
+        # 匹配估值价格并计算市值
+        market_prices = {row["股票代码"]: row["价格"] for row in estimated_cashflows} if "estimated_cashflows" in locals() else {}
+        stock_summary["估值价格"] = stock_summary["股票代码"].map(market_prices).fillna(0.0)
+        stock_summary["当前市值"] = stock_summary["当前持仓"] * stock_summary["估值价格"]
         st.dataframe(stock_summary, use_container_width=True)
     else:
         st.info("当前没有任何持仓。")
