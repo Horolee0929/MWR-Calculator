@@ -25,7 +25,7 @@ def get_empty_df():
         "日期": pd.Series(dtype="datetime64[ns]"),
         "金额": pd.Series(dtype="float"),
         "币种": pd.Series(dtype="str"),
-        "类型": pd.Series(dtype="str"),
+        
         "股票代码": pd.Series(dtype="str"),
         "市场": pd.Series(dtype="str"),
         "股数": pd.Series(dtype="float"),
@@ -44,7 +44,7 @@ edited_df = st.data_editor(
         "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "金额": st.column_config.NumberColumn(format="%.2f"),
         "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
-        "类型": st.column_config.SelectboxColumn(options=["转入资金", "转出资金", "买入股票", "卖出股票"]),
+        
         "股票代码": st.column_config.TextColumn(),
         "市场": st.column_config.SelectboxColumn(options=["港股", "美股", "A股", "其他"]),
         "股数": st.column_config.NumberColumn(format="%.2f"),
