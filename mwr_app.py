@@ -153,11 +153,11 @@ if not holdings.empty:
             "日期": dt.date.today(),
             "金额": market_value,
             "币种": base_currency,
-            "买卖方向": "卖出股票",
+            "买卖方向": "卖出股票", # 模拟持仓估值流入，用于计算 XIRR
             "股票代码": stock_code,
             "市场": market,
             "股数": shares,
-            "价格": None
+            价格": final_price  
         })
 
     if estimated_cashflows:
@@ -182,10 +182,16 @@ def calculate_xirr(cash_flows):
 # 🧮 自动计算当前持仓股数 × 当前输入价格
 if not edited_df.empty:
     net_positions = edited_df.copy()
-    net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
+     net_positions = net_positions[~(
+        (net_positions["买卖方向"] == "卖出股票") &
+        (net_positions["金额"].notna()) &
+        (net_positions["日期"] == dt.date.today())
+    )]
     net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
     stock_summary = net_positions.groupby(["股票代码", "市场", "币种"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
+    
+
 
     st.markdown("---")
     st.subheader("📦 当前股票净持仓（含 previous close price 和持有资产价值）")
