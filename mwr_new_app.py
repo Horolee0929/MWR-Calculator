@@ -44,7 +44,7 @@ if "cashflow_df" not in st.session_state:
 
 edited_df = st.session_state.cashflow_df.copy()
 
- # 抓取汇率函数
+# 抓取汇率函数
 def get_historical_rate(date_str, base_currency, target_currency):
     url = f"https://api.exchangerate.host/{date_str}"
     params = {"base": base_currency, "symbols": target_currency}
@@ -63,15 +63,17 @@ def get_historical_rate(date_str, base_currency, target_currency):
 def update_cashflow_df(df):
     for idx, row in df.iterrows():
         
-   # 自动补汇率和金额     
-   
-    if pd.notna(row["日期"]) and pd.notna(row["币种"]) and pd.notna(row["目标币种"]):
+# 自动补汇率和金额     
+def update_cashflow_df(df):
+    for idx, row in df.iterrows():
+        # 自动补汇率
+        if pd.notna(row["日期"]) and pd.notna(row["币种"]) and pd.notna(row["目标币种"]):
             if pd.isna(row["汇率"]):
                 rate = get_historical_rate(str(row["日期"].date()), row["币种"], row["目标币种"])
                 if rate is not None:
                     df.at[idx, "汇率"] = rate
 
-        # 自动补金额（无论汇率来自 API 还是手填）
+        # 自动补金额
         if pd.isna(row["金额"]):
             if pd.notna(row["价格"]) and pd.notna(row["股数"]) and pd.notna(row["汇率"]):
                 df.at[idx, "金额"] = row["价格"] * row["股数"] * row["汇率"]
