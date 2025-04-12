@@ -82,11 +82,13 @@ for idx, row in edited_df.iterrows():
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
 
-# 删除“市场”字段，如果存在的话
-if "市场" in edited_df.columns:
-    edited_df.drop(columns=["市场"], inplace=True)
-
-
 
 # 同步回 session_state
 st.session_state.cashflow_df = edited_df
+
+# 显示当前表格
+st.data_editor(
+    edited_df,
+    use_container_width=True,
+    key="cashflow_editor_display"
+)
