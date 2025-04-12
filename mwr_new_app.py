@@ -27,7 +27,7 @@ st.markdown("""
 请在下方表格中填写每一笔投资记录，包含：
 - 日期
 - 金额
-- 币种（RMB / HKD / USD / CHF）
+- 币种（CNY / HKD / USD / CHF）
 - 类型（流入：卖出或当前估值，流出：买入或转入）
 - 股票信息（可选）：买了哪只股票、股数、每股价格
 系统将自动识别你投入的资金流、实际买入的股票、当前估值并自动生成收益率。
@@ -53,13 +53,22 @@ if "cashflow_df" not in st.session_state:
 edited_df = st.session_state.cashflow_df.copy()
 
 # 自动补汇率和金额（无须按钮）
-for idx, row in edited_df.iterrows():
-    if pd.notna(row["日期"]) and pd.notna(row["币种"]) and pd.notna(row["目标币种"]):
-        if pd.isna(row["汇率"]):
-            rate = get_historical_rate(str(row["日期"].date()), row["币种"], row["目标币种"])
-            if rate is not None:
-                edited_df.at[idx, "汇率"] = rate
 
+def get_historical_rate(date_str, base_currency, target_currency):
+    url = f"https://api.exchangerate.host/{date_str}"
+    params = {"base": base_currency, "symbols": target_currency}
+    try:
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        rate = data["rates"].get(target_currency, None)
+        if rate is None:
+            st.warning(f"无法获取汇率：{base_currency} → {target_currency}（可能是币种代码不对）")
+        return rate
+    except Exception as e:
+        st.error(f"汇率查询失败：{e}")
+        return None
+        
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
@@ -75,11 +84,11 @@ st.data_editor(
         "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
         "股票代码": st.column_config.TextColumn(),
-        "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
+        "币种": st.column_config.SelectboxColumn(options=["CNY", "HKD", "USD", "CHF"]),
         "价格": st.column_config.NumberColumn(format="%.2f"),
         "股数": st.column_config.NumberColumn(format="%.2f"),
         "汇率": st.column_config.NumberColumn(format="%.4f"),
-        "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
+        "目标币种": st.column_config.SelectboxColumn(options=["CNY", "CHF"]),
         "金额": st.column_config.NumberColumn(format="%.2f"),
     }
 )
