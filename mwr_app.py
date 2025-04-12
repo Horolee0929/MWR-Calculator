@@ -56,47 +56,41 @@ edited_df = st.data_editor(
 
 
 # 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
+类型映射 = {"现金转入": 1, "卖出股票": 1, "现金转出": -1, "买入股票": -1}
+
 for idx, row in edited_df.iterrows():
     if row["买卖方向"] in 类型映射:
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["买卖方向"]]
+        edited_df.at[idx, "逻辑类型"] = "流入" if 类型映射[row["买卖方向"]] == 1 else "流出"
 
     # 自动填写金额（买入或卖出）
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"]
 
-    # 自动填写买入价格（当金额已知）
+    # 自动填写价格（当金额已知）
     elif pd.isna(row["价格"]):
         if pd.notna(row["股数"]) and pd.notna(row["金额"]):
             try:
                 edited_df.at[idx, "价格"] = row["金额"] / row["股数"]
             except ZeroDivisionError:
                 pass
-    if row["买卖方向"] in 类型映射:
-        
-    # 自动填写金额
-    if pd.isna(row["金额"]):
-        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
-            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
 
-    # 自动填写买入价格
-    elif pd.isna(row["买入价格"]):
-        if pd.notna(row["股数"]) and pd.notna(row["金额"]):
-            try:
-                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
-            except ZeroDivisionError:
-                pass
+    # 自动设置币种 = 市场（港股→HKD, 美股→USD, A股→RMB）
+    if pd.isna(row["币种"]) and pd.notna(row["市场"]):
+        if row["市场"] == "港股":
+            edited_df.at[idx, "币种"] = "HKD"
+        elif row["市场"] == "美股":
+            edited_df.at[idx, "币种"] = "USD"
+        elif row["市场"] == "A股":
+            edited_df.at[idx, "币种"] = "RMB"
 
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["买卖方向"]]
-    if pd.isna(row["金额"]):
-        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
-            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
-    elif pd.isna(row["买入价格"]):
-        if pd.notna(row["股数"]) and pd.notna(row["金额"]):
-            try:
-                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
-            except ZeroDivisionError:
-                pass
+    # 自动修正金额符号（流入为正，流出为负）
+    if pd.notna(row["金额"]):
+        amt = abs(row["金额"])
+        if edited_df.at[idx, "逻辑类型"] == "流出":
+            edited_df.at[idx, "金额"] = -amt
+        elif edited_df.at[idx, "逻辑类型"] == "流入":
+            edited_df.at[idx, "金额"] = amt
 
 # 将自定义类型映射为逻辑流向
 类型映射 = {"现金转入": 1, "卖出股票": 1, "现金转出": -1, "买入股票": -1}
