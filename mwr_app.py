@@ -119,20 +119,26 @@ if not holdings.empty:
         if market == "港股":
             ticker = f"{stock_code}.HK"
         elif market == "美股":
-            ticker = stock_code
+            ticker = "AAPL" if stock_code.upper() == "APPL" else stock_code.upper()
         else:
             ticker = stock_code
 
         # 默认失败 fallback
         price = None
 
-        # 查询雅虎财经
+        # 查询雅虎财经 + 容错机制
         try:
             yurl = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
             r = requests.get(yurl)
             r.raise_for_status()
             data = r.json()
-            price = data['quoteResponse']['result'][0]['regularMarketPrice']
+            results = data.get("quoteResponse", {}).get("result", [])
+            if results and "regularMarketPrice" in results[0]:
+                price = results[0]["regularMarketPrice"]
+            else:
+                st.warning(f"⚠️ 无法从返回数据中获取 {ticker} 的收盘价，请手动填写。")
+        except Exception as e:
+            st.warning(f"⚠️ 获取 {ticker} 的实时价格失败，请手动填写。错误：{e}")
         except:
             st.warning(f"⚠️ 无法获取 {ticker} 的实时股价，请手动填写。")
 
@@ -182,13 +188,25 @@ if not edited_df.empty:
     stock_summary = net_positions.groupby(["股票代码", "市场", "币种"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
 
     st.markdown("---")
-    st.subheader("📦 当前股票净持仓")
+    st.subheader("📦 当前股票净持仓（含 previous close price 和持有资产价值）")
     if not stock_summary.empty:
         # 匹配估值价格并计算市值
-        market_prices = {row["股票代码"]: row["价格"] for row in estimated_cashflows} if "estimated_cashflows" in locals() else {}
-        stock_summary["估值价格"] = stock_summary["股票代码"].map(market_prices).fillna(0.0)
-        stock_summary["当前市值"] = stock_summary["当前持仓"] * stock_summary["估值价格"]
-        st.dataframe(stock_summary, use_container_width=True)
+        market_prices = {
+            (row["股票代码"], row["市场"]): row["价格"]
+            for row in estimated_cashflows
+            if row.get("股票代码") and row.get("市场")
+        } if "estimated_cashflows" in locals() else {}
+        def get_price_label(row):
+    ccy = row["币种"]
+    return f"previous close price ({ccy})"
+
+stock_summary["价格列名"] = stock_summary.apply(get_price_label, axis=1)
+stock_summary["previous close price"] = stock_summary.apply(lambda x: market_prices.get((x["股票代码"], x["市场"]), 0.0), axis=1)
+        stock_summary["持有资产价值"] = stock_summary["当前持仓"] * stock_summary["previous close price"]
+stock_summary["持有资产价值列名"] = stock_summary["价格列名"].str.replace("previous close price", "持有资产价值")
+        display_df = stock_summary[["股票代码", "市场", "当前持仓", "previous close price", "持有资产价值"]].copy()
+display_df.columns = ["股票代码", "市场", "当前持仓", stock_summary["价格列名"].iloc[0], stock_summary["持有资产价值列名"].iloc[0]]
+st.dataframe(display_df, use_container_width=True)
     else:
         st.info("当前没有任何持仓。")
 st.markdown("---")
