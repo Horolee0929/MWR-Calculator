@@ -86,9 +86,4 @@ for idx, row in edited_df.iterrows():
 # 同步回 session_state
 st.session_state.cashflow_df = edited_df
 
-# 显示当前表格
-st.data_editor(
-    edited_df,
-    use_container_width=True,
-    key="cashflow_editor_display"
-)
+
