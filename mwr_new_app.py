@@ -78,7 +78,7 @@ st.data_editor(
         "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
         "价格": st.column_config.NumberColumn(format="%.2f"),
         "股数": st.column_config.NumberColumn(format="%.2f"),
-        "汇率": st.column_config.NumberColumn(format="%.4f")
+        "汇率": st.column_config.NumberColumn(format="%.4f"),
         "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
         "金额": st.column_config.NumberColumn(format="%.2f"),
     }
