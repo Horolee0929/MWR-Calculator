@@ -86,13 +86,7 @@ for idx, row in edited_df.iterrows():
 if "市场" in edited_df.columns:
     edited_df.drop(columns=["市场"], inplace=True)
 
-# 显示更新后的表格
-st.subheader("📋 投资记录明细（金额按目标币种自动换算）")
-st.data_editor(
-    edited_df,
-    use_container_width=True,
-    disabled=["金额"]
-)
+
 
 # 同步回 session_state
 st.session_state.cashflow_df = edited_df
