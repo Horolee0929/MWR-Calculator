@@ -60,8 +60,7 @@ def get_historical_rate(date_str, base_currency, target_currency):
         st.warning(f"无法获取 {date_str} 的汇率，请手动输入。错误: {e}")
         return None
 
-def update_cashflow_df(df):
-    for idx, row in df.iterrows():
+
         
 # 自动补汇率和金额     
 def update_cashflow_df(df):
