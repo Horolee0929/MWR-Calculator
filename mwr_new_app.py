@@ -81,8 +81,8 @@ def update_cashflow_df(df):
     
 
 # 显示表格并可编辑除了金额列
-st.data_editor(
-    edited_df,
+edited_df = st.data_editor(
+    st.session_state.cashflow_df,
     num_rows="dynamic",
     use_container_width=True,
     key="cashflow_editor",
@@ -99,7 +99,7 @@ st.data_editor(
     }
 )
 
-disabled=["金额"] 
+ 
 
 
 # 自动更新逻辑
