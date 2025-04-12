@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 import requests
+import datetime as dt
+today = dt.date.today()
 
 st.set_page_config(page_title="MWR计算器", layout="centered")
 
@@ -184,7 +186,7 @@ if not edited_df.empty:
     net_positions = edited_df.copy()
     net_positions = net_positions[~(
         (net_positions["买卖方向"] == "卖出股票") &
-        (pd.to_datetime(net_positions["日期"]).dt.date == today)
+        (net_positions["日期"].dt.normalize() == today)
     )]
     net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
