@@ -205,7 +205,7 @@ if not edited_df.empty:
         stock_summary["持有资产价值"] = stock_summary["当前持仓"] * stock_summary["previous close price"]
         stock_summary["持有资产价值列名"] = stock_summary["价格列名"].str.replace("previous close price", "持有资产价值")
         display_df = stock_summary[["股票代码", "市场", "当前持仓", "previous close price", "持有资产价值"]].copy()
-        display_df.columns = ["股票代码", "市场", "当前持仓", stock_summary["价格列名"].iloc[0], stock_summary["持有资产价值列名"].iloc[0]].iloc[0], stock_summary["持有资产价值列名"].iloc[0]]
+        display_df.columns = ["股票代码", "市场", "当前持仓", stock_summary["价格列名"].iloc[0], stock_summary["持有资产价值列名"].iloc[0]], stock_summary["持有资产价值列名"].iloc[0]]
         st.dataframe(display_df, use_container_width=True)
     else:
         st.info("当前没有任何持仓。")
