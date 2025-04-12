@@ -84,5 +84,7 @@ st.data_editor(
     }
 )
 
+disabled=["金额"] 
+
 # 同步回 session_state
 st.session_state.cashflow_df = edited_df
