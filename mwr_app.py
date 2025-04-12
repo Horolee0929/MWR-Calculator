@@ -168,12 +168,12 @@ if st.button("📊 计算 MWR（按不同币种）"):
             cf_df["金额转换"] = convert(cf_df, ccy)
             cf_df_sorted = cf_df.sort_values("日期")
             cash_flows = []
-for _, row in cf_df_sorted.iterrows():
-    amt = abs(row["金额转换"]) if row["类型"] == "流入" else -abs(row["金额转换"])
-    cash_flows.append((row["日期"], amt))
+        for _, row in cf_df_sorted.iterrows():
+        amt = abs(row["金额转换"]) if row["类型"] == "流入" else -abs(row["金额转换"])
+        cash_flows.append((row["日期"], amt))
             result = calculate_xirr(cash_flows)
             with st.expander(f"{ccy} 计价 MWR 计算明细"):
                 st.dataframe(cf_df_sorted[["日期", "金额", "币种", "类型", "股票代码", "市场", "金额转换"]], use_container_width=True)
                 st.success(f"📈 MWR（{ccy}）年化收益率：{result:.2%}")
-    except Exception as e:
+        except Exception as e:
         st.error(f"计算出错：{e}")
