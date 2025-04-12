@@ -40,7 +40,7 @@ def get_empty_df():
         "价格": pd.Series(dtype="float"),
         "股数": pd.Series(dtype="float"),
         "汇率": pd.Series(dtype="float"),
-        "目标币种": pd.Series(dtype="str")
+        "目标币种": pd.Series(dtype="str"),
         "金额": pd.Series(dtype="float"),
     })
 
