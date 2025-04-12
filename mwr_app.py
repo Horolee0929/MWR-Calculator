@@ -57,19 +57,19 @@ edited_df = st.data_editor(
 
 # 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
 for idx, row in edited_df.iterrows():
-    if row["类型"] in 类型映射:
+    if row["买卖方向"] in 类型映射:
         edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
 
     # 自动填写金额（买入或卖出）
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]):
-            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
+            edited_df.at[idx, "金额"] = row["股数"] * row["价格"]
 
     # 自动填写买入价格（当金额已知）
-    elif pd.isna(row["买入价格"]):
+    elif pd.isna(row["价格"]):
         if pd.notna(row["股数"]) and pd.notna(row["金额"]):
             try:
-                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
+                edited_df.at[idx, "价格"] = row["金额"] / row["股数"]
             except ZeroDivisionError:
                 pass
     if row["类型"] in 类型映射:
@@ -102,7 +102,7 @@ for idx, row in edited_df.iterrows():
                 pass
 
 # 将自定义类型映射为逻辑流向
-类型映射 = {"转入资金": "流入", "卖出股票": "流入", "转出资金": "流出", "买入股票": "流出"}
+类型映射 = {"现金转入": "流入", "卖出股票": "流入", "现金转出": "流出", "买入股票": "流出"}
 
 # 根据逻辑完善金额、币种字段
 for idx, row in edited_df.iterrows():
@@ -113,7 +113,7 @@ for idx, row in edited_df.iterrows():
     if edited_df.at[idx, "逻辑类型"] == "流出" and pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
-    elif edited_df.at[idx, "逻辑类型"] == "流入" and row["类型"] == "卖出股票" and pd.isna(row["金额"]):
+    elif edited_df.at[idx, "逻辑类型"] == "流入" and row["买卖方向"] == "卖出股票" and pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
     # 自动设置币种 = 市场（港股→HKD, 美股→USD, A股→RMB）
@@ -127,7 +127,7 @@ for idx, row in edited_df.iterrows():
     # 自动修正金额符号（流入为正，流出为负）
     if pd.notna(row["金额"]):
         amt = abs(row["金额"])
-        if row["类型"] == "流出":
+        if row["逻辑类型"] == "流出":
             edited_df.at[idx, "金额"] = -amt
         elif edited_df.at[idx, "逻辑类型"] == "流入":
             edited_df.at[idx, "金额"] = amt
@@ -229,7 +229,7 @@ if not edited_df.empty:
 st.markdown("---")
 st.subheader("📊 投资现金流汇总")
 
-summary_df = edited_df[["日期", "金额", "币种", "类型"]].dropna()
+summary_df = edited_df[["日期", "金额", "币种", "买卖方向"]].dropna()
 summary_df = summary_df.sort_values("日期")
 st.dataframe(summary_df, use_container_width=True)
 
@@ -251,7 +251,7 @@ if st.button("📊 计算 MWR（多币种分别计算）"):
                 result = calculate_xirr(cash_flows)
                 st.markdown(f"**{currency}：{result:.2%}**")
                 with st.expander(f"📋 {currency} 现金流明细"):
-                    st.dataframe(group[["日期", "金额", "币种", "类型", "股票代码", "市场"]], use_container_width=True)
+                    st.dataframe(group[["日期", "金额", "币种", "买卖方向", "股票代码", "市场"]], use_container_width=True)
             except Exception as calc_error:
                 st.warning(f"{currency} 计算失败：{calc_error}")
 
