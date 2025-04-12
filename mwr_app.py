@@ -99,38 +99,57 @@ if not incomplete_rows.empty:
     st.error("⚠️ 有投资记录缺少股数，请补全股数后再计算。")
     st.stop()
 
-# 自动生成当前估值记录
+# 自动生成当前估值记录（使用实时股价 API 或手动输入）
 holdings = edited_df[(edited_df["类型"] == "流出") & (edited_df["股数"] > 0)]
 
 if not holdings.empty:
-    grouped = holdings.groupby(["股票代码", "市场"])["股数"].sum().reset_index()
     st.markdown("---")
-    st.subheader("📘 当前持仓估值输入")
+    st.subheader("📘 当前持仓估值输入（自动获取或手动填入价格）")
 
     estimated_cashflows = []
+    grouped = holdings.groupby(["股票代码", "市场", "币种"])["股数"].sum().reset_index()
 
     for _, row in grouped.iterrows():
-        st.markdown(f"### 股票：{row['股票代码']}（{row['市场']}）")
+        stock_code = row["股票代码"]
+        market = row["市场"]
+        base_currency = row["币种"]
         shares = row["股数"]
-        current_price = st.number_input(f"当前价格（{row['市场']}，单位对应币种） - {row['股票代码']}", min_value=0.0, value=500.0)
 
-        if row["市场"] == "港股":
-            currency = "HKD"
-        elif row["市场"] == "美股":
-            currency = "USD"
-        elif row["市场"] == "A股":
-            currency = "RMB"
+        # 根据市场构建查询代码（这里只处理港股）
+        if market == "港股":
+            ticker = f"{stock_code}.HK"
+        elif market == "美股":
+            ticker = stock_code
         else:
-            currency = "RMB"
+            ticker = stock_code
 
-        market_value = current_price * shares
+        # 默认失败 fallback
+        price = None
+
+        # 查询雅虎财经
+        try:
+            yurl = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
+            r = requests.get(yurl)
+            r.raise_for_status()
+            data = r.json()
+            price = data['quoteResponse']['result'][0]['regularMarketPrice']
+        except:
+            st.warning(f"⚠️ 无法获取 {ticker} 的实时股价，请手动填写。")
+
+        final_price = st.number_input(
+            f"{stock_code} 当前价格（单位：{base_currency}）",
+            min_value=0.0,
+            value=price if price is not None else 0.0
+        )
+
+        market_value = final_price * shares
         estimated_cashflows.append({
             "日期": dt.date.today(),
             "金额": market_value,
-            "币种": currency,
+            "币种": base_currency,
             "类型": "流入",
-            "股票代码": row["股票代码"],
-            "市场": row["市场"],
+            "股票代码": stock_code,
+            "市场": market,
             "股数": shares,
             "买入价格": None
         })
@@ -138,8 +157,7 @@ if not holdings.empty:
     if estimated_cashflows:
         edited_df = pd.concat([edited_df, pd.DataFrame(estimated_cashflows)], ignore_index=True)
 
-# 💡 识别 cash drag（未使用的现金）期间也视为投资期，反映在 MWR 中
-# MWR 计算函数
+# 计算函数
 
 def calculate_xirr(cash_flows):
     def xnpv(rate):
@@ -153,8 +171,32 @@ def calculate_xirr(cash_flows):
             high = mid
     return mid
 
+# 汇总信息展示
+
+# 🧮 自动计算当前持仓股数 × 当前输入价格
+if not edited_df.empty:
+    net_positions = edited_df.copy()
+    net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
+    net_positions["方向"] = net_positions["类型"].apply(lambda x: 1 if x == "流入" else -1)
+    net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
+    stock_summary = net_positions.groupby(["股票代码", "市场"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
+
+    st.markdown("---")
+    st.subheader("📦 当前股票净持仓")
+    if not stock_summary.empty:
+        st.dataframe(stock_summary, use_container_width=True)
+    else:
+        st.info("当前没有任何持仓。")
+st.markdown("---")
+st.subheader("📊 投资现金流汇总")
+
+summary_df = edited_df[["日期", "金额", "币种", "类型"]].dropna()
+summary_df = summary_df.sort_values("日期")
+st.dataframe(summary_df, use_container_width=True)
+
 # 计算入口
 if st.button("📊 计算 MWR（按不同币种）"):
+    mwr_results = {}
     try:
         def convert(df, to_currency):
             rate_map = {"RMB": 1.0, "HKD": hkd_to_rmb, "USD": hkd_to_usd, "CHF": hkd_to_chf}
@@ -172,8 +214,14 @@ if st.button("📊 计算 MWR（按不同币种）"):
                 amt = abs(row["金额转换"]) if row["类型"] == "流入" else -abs(row["金额转换"])
                 cash_flows.append((row["日期"], amt))
             result = calculate_xirr(cash_flows)
+            mwr_results[ccy] = result
             with st.expander(f"{ccy} 计价 MWR 计算明细"):
                 st.dataframe(cf_df_sorted[["日期", "金额", "币种", "类型", "股票代码", "市场", "金额转换"]], use_container_width=True)
                 st.success(f"📈 MWR（{ccy}）年化收益率：{result:.2%}")
     except Exception as e:
         st.error(f"计算出错：{e}")
+
+    st.markdown("---")
+    st.subheader("📈 汇总：各币种计价 MWR")
+    for ccy, res in mwr_results.items():
+        st.write(f"**{ccy}：{res:.2%}**")
