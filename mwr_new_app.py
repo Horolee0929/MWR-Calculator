@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -48,23 +47,7 @@ def get_empty_df():
 if "cashflow_df" not in st.session_state:
     st.session_state.cashflow_df = get_empty_df()
 
-edited_df = st.data_editor(
-    st.session_state.cashflow_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={
-        "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
-        "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
-        "金额": st.column_config.NumberColumn(format="%.2f"),
-        "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
-        "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
-        "股票代码": st.column_config.TextColumn(),
-        "股数": st.column_config.NumberColumn(format="%.2f"),
-        "价格": st.column_config.NumberColumn(format="%.2f"),
-        "汇率": st.column_config.NumberColumn(format="%.4f")
-    },
-    key="cashflow_editor"
-)
+edited_df = st.session_state.cashflow_df.copy()
 
 # 自动补汇率
 for idx, row in edited_df.iterrows():
@@ -82,8 +65,24 @@ for idx, row in edited_df.iterrows():
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
 
+# 显示表格并可编辑除了金额列
+st.data_editor(
+    edited_df,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="cashflow_editor",
+    column_config={
+        "买卖方向": st.column_config.SelectboxColumn(options=["现金转入", "现金转出", "买入股票", "卖出股票"]),
+        "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
+        "金额": st.column_config.NumberColumn(format="%.2f"),
+        "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
+        "目标币种": st.column_config.SelectboxColumn(options=["RMB", "CHF"]),
+        "股票代码": st.column_config.TextColumn(),
+        "股数": st.column_config.NumberColumn(format="%.2f"),
+        "价格": st.column_config.NumberColumn(format="%.2f"),
+        "汇率": st.column_config.NumberColumn(format="%.4f")
+    }
+)
 
 # 同步回 session_state
 st.session_state.cashflow_df = edited_df
-
-
