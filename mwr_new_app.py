@@ -26,7 +26,7 @@ st.markdown("""
 - 金额
 - 币种（RMB / HKD / USD / CHF）
 - 类型（流入：卖出或当前估值，流出：买入或转入）
-- 股票信息（可选）：买了哪只股票（港股/美股/A股）、股数、每股价格
+- 股票信息（可选）：买了哪只股票、股数、每股价格
 系统将自动识别你投入的资金流、实际买入的股票、当前估值并自动生成收益率。
 """)
 
@@ -80,5 +80,8 @@ for idx, row in edited_df.iterrows():
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["价格"] * row["汇率"]
+
+# 移除市场字段（更新后的数据结构不再包括“市场”字段）
+edited_df.drop(columns=["市场"], errors="ignore", inplace=True)
 
 # 剩余原逻辑保持不变，可在之后继续处理 edited_df 内容
