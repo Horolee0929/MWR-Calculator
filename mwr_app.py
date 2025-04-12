@@ -182,7 +182,10 @@ def calculate_xirr(cash_flows):
 # 🧮 自动计算当前持仓股数 × 当前输入价格
 if not edited_df.empty:
     net_positions = edited_df.copy()
-    net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
+    net_positions = net_positions[~(
+        (net_positions["买卖方向"] == "卖出股票") &
+        (net_positions["日期"] == today)
+    )]
     net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
     stock_summary = net_positions.groupby(["股票代码", "市场", "币种"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
@@ -214,34 +217,35 @@ if not edited_df.empty:
         st.dataframe(display_df, use_container_width=True)
     else:
         st.info("当前没有任何持仓。")
-st.markdown("---")
-st.subheader("📊 投资现金流汇总")
-
-summary_df = edited_df[["日期", "金额", "币种", "买卖方向"]].dropna()
-summary_df = summary_df.sort_values("日期")
-st.dataframe(summary_df, use_container_width=True)
-
-# 计算入口
-if st.button("📊 计算 MWR（多币种分别计算）"):
-    try:
-        cf_df = edited_df.copy()
-        cf_df_sorted = cf_df.sort_values("日期")
-        currency_groups = cf_df_sorted.groupby("币种")
-
-        st.subheader("📈 各币种计价的 MWR 年化收益率")
-        for currency, group in currency_groups:
-            group = group.copy()
-            cash_flows = []
-            for _, row in group.iterrows():
-                amt = abs(row["金额"]) if 类型映射.get(row["买卖方向"], 0) == 1 else -abs(row["金额"])
-                cash_flows.append((row["日期"], amt))
-            try:
-                result = calculate_xirr(cash_flows)
-                st.markdown(f"**{currency}：{result:.2%}**")
-                with st.expander(f"📋 {currency} 现金流明细"):
-                    st.dataframe(group[["日期", "金额", "币种", "买卖方向", "股票代码", "市场"]], use_container_width=True)
-            except Exception as calc_error:
-                st.warning(f"{currency} 计算失败：{calc_error}")
-
-    except Exception as e:
-        st.error(f"计算出错：{e}")
+        
+    st.markdown("---")
+    st.subheader("📊 投资现金流汇总")
+    
+    summary_df = edited_df[["日期", "金额", "币种", "买卖方向"]].dropna()
+    summary_df = summary_df.sort_values("日期")
+    st.dataframe(summary_df, use_container_width=True)
+    
+    # 计算入口
+    if st.button("📊 计算 MWR（多币种分别计算）"):
+        try:
+            cf_df = edited_df.copy()
+            cf_df_sorted = cf_df.sort_values("日期")
+            currency_groups = cf_df_sorted.groupby("币种")
+    
+            st.subheader("📈 各币种计价的 MWR 年化收益率")
+            for currency, group in currency_groups:
+                group = group.copy()
+                cash_flows = []
+                for _, row in group.iterrows():
+                    amt = abs(row["金额"]) if 类型映射.get(row["买卖方向"], 0) == 1 else -abs(row["金额"])
+                    cash_flows.append((row["日期"], amt))
+                try:
+                    result = calculate_xirr(cash_flows)
+                    st.markdown(f"**{currency}：{result:.2%}**")
+                    with st.expander(f"📋 {currency} 现金流明细"):
+                        st.dataframe(group[["日期", "金额", "币种", "买卖方向", "股票代码", "市场"]], use_container_width=True)
+                except Exception as calc_error:
+                    st.warning(f"{currency} 计算失败：{calc_error}")
+    
+        except Exception as e:
+            st.error(f"计算出错：{e}")
