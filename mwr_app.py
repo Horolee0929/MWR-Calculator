@@ -58,7 +58,7 @@ edited_df = st.data_editor(
 # 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
 for idx, row in edited_df.iterrows():
     if row["买卖方向"] in 类型映射:
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["买卖方向"]]
 
     # 自动填写金额（买入或卖出）
     if pd.isna(row["金额"]):
@@ -72,9 +72,8 @@ for idx, row in edited_df.iterrows():
                 edited_df.at[idx, "价格"] = row["金额"] / row["股数"]
             except ZeroDivisionError:
                 pass
-    if row["类型"] in 类型映射:
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
-
+    if row["买卖方向"] in 类型映射:
+        
     # 自动填写金额
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
@@ -87,10 +86,8 @@ for idx, row in edited_df.iterrows():
                 edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
             except ZeroDivisionError:
                 pass
-for idx, row in edited_df.iterrows():
-    # 映射“类型”为流入流出逻辑
-    if row["类型"] in 类型映射:
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["买卖方向"]]
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
@@ -102,12 +99,12 @@ for idx, row in edited_df.iterrows():
                 pass
 
 # 将自定义类型映射为逻辑流向
-类型映射 = {"现金转入": "流入", "卖出股票": "流入", "现金转出": "流出", "买入股票": "流出"}
+类型映射 = {"现金转入": 1, "卖出股票": 1, "现金转出": -1, "买入股票": -1}
 
 # 根据逻辑完善金额、币种字段
 for idx, row in edited_df.iterrows():
-    if row["类型"] in 类型映射:
-        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+    if row["买卖方向"] in 类型映射:
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["买卖方向"]]
 for idx, row in edited_df.iterrows():
     # 自动设置金额 = 股数 * 买入价格（仅限流出）
     if edited_df.at[idx, "逻辑类型"] == "流出" and pd.isna(row["金额"]):
@@ -216,7 +213,7 @@ def calculate_xirr(cash_flows):
 if not edited_df.empty:
     net_positions = edited_df.copy()
     net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
-    net_positions["方向"] = net_positions["逻辑类型"].apply(lambda x: 1 if x == "流入" else -1)
+    net_positions["方向"] = net_positions["买卖方向"].map(类型映射).fillna(0)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
     stock_summary = net_positions.groupby(["股票代码", "市场"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
 
