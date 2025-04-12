@@ -224,6 +224,7 @@ if not edited_df.empty:
     st.subheader("📊 投资现金流汇总")
     
     summary_df = edited_df[["日期", "金额", "币种", "买卖方向"]].dropna()
+    summary_df["日期"] = pd.to_datetime(summary_df["日期"], errors="coerce")
     summary_df = summary_df.sort_values("日期")
     st.dataframe(summary_df, use_container_width=True)
     
@@ -231,6 +232,7 @@ if not edited_df.empty:
     if st.button("📊 计算 MWR（多币种分别计算）"):
         try:
             cf_df = edited_df.copy()
+            cf_df["日期"] = pd.to_datetime(cf_df["日期"], errors="coerce")
             cf_df_sorted = cf_df.sort_values("日期")
             currency_groups = cf_df_sorted.groupby("币种")
     
