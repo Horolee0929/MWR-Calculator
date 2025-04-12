@@ -6,17 +6,6 @@ import requests
 import datetime as dt
 today = dt.date.today()
 
-def get_historical_rate(date_str, base_currency, target_currency):
-    url = f"https://api.exchangerate.host/{date_str}"
-    params = {"base": base_currency, "symbols": target_currency}
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        return data["rates"].get(target_currency, None)
-    except Exception as e:
-        st.warning(f"无法获取 {date_str} 的 {base_currency} → {target_currency} 汇率，请手动输入。错误: {e}")
-    return None
 
     
 
@@ -32,6 +21,9 @@ st.markdown("""
 - 股票信息（可选）：买了哪只股票、股数、每股价格
 系统将自动识别你投入的资金流、实际买入的股票、当前估值并自动生成收益率。
 """)
+
+
+
 
 @st.cache_data
 def get_empty_df():
@@ -52,7 +44,7 @@ if "cashflow_df" not in st.session_state:
 
 edited_df = st.session_state.cashflow_df.copy()
 
-# 自动补汇率和金额（无须按钮）
+# 自动补汇率和金额
 
 def get_historical_rate(date_str, base_currency, target_currency):
     url = f"https://api.exchangerate.host/{date_str}"
@@ -62,12 +54,10 @@ def get_historical_rate(date_str, base_currency, target_currency):
         response.raise_for_status()
         data = response.json()
         rate = data["rates"].get(target_currency, None)
-        if rate is None:
-            st.warning(f"无法获取汇率：{base_currency} → {target_currency}（可能是币种代码不对）")
-        return rate
+        return data["rates"].get(target_currency, None)
     except Exception as e:
-        st.error(f"汇率查询失败：{e}")
-        return None
+        st.warning(f"无法获取 {date_str} 的 {base_currency} → {target_currency} 汇率，请手动输入。错误: {e}")
+    return None
         
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["价格"]) and pd.notna(row["汇率"]):
@@ -95,5 +85,7 @@ st.data_editor(
 
 disabled=["金额"] 
 
-# 同步回 session_state
+
+# 自动更新逻辑
+edited_df = update_cashflow_df(edited_df)
 st.session_state.cashflow_df = edited_df
