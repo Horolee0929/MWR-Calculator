@@ -21,6 +21,7 @@ st.markdown("""
 @st.cache_data
 def get_empty_df():
     return pd.DataFrame({
+        "买卖方向": pd.Series(dtype="str"),
         "日期": pd.Series(dtype="datetime64[ns]"),
         "金额": pd.Series(dtype="float"),
         "币种": pd.Series(dtype="str"),
@@ -39,10 +40,11 @@ edited_df = st.data_editor(
     num_rows="dynamic",
     use_container_width=True,
     column_config={
+        "买卖方向": st.column_config.SelectboxColumn(options=["买入", "卖出", "", None]),
         "日期": st.column_config.DateColumn(format="YYYY-MM-DD"),
         "金额": st.column_config.NumberColumn(format="%.2f"),
         "币种": st.column_config.SelectboxColumn(options=["RMB", "HKD", "USD", "CHF"]),
-        "类型": st.column_config.SelectboxColumn(options=["流入", "流出"]),
+        "类型": st.column_config.SelectboxColumn(options=["转入资金", "转出资金", "买入股票", "卖出股票"]),
         "股票代码": st.column_config.TextColumn(),
         "市场": st.column_config.SelectboxColumn(options=["港股", "美股", "A股", "其他"]),
         "股数": st.column_config.NumberColumn(format="%.2f"),
@@ -81,8 +83,27 @@ else:
     hkd_to_usd = rates["HKD_USD"]
     hkd_to_chf = rates["HKD_CHF"]
 
-# 自动补金额或买入价格
+# 自动补金额或买入价格，并自动设置币种与市场一致，金额正负依类型/买卖方向确定
 for idx, row in edited_df.iterrows():
+    if row["类型"] in 类型映射:
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+
+    # 自动填写金额
+    if pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
+
+    # 自动填写买入价格
+    elif pd.isna(row["买入价格"]):
+        if pd.notna(row["股数"]) and pd.notna(row["金额"]):
+            try:
+                edited_df.at[idx, "买入价格"] = row["金额"] / row["股数"]
+            except ZeroDivisionError:
+                pass
+for idx, row in edited_df.iterrows():
+    # 映射“类型”为流入流出逻辑
+    if row["类型"] in 类型映射:
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
     if pd.isna(row["金额"]):
         if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
             edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
@@ -93,14 +114,45 @@ for idx, row in edited_df.iterrows():
             except ZeroDivisionError:
                 pass
 
+# 将自定义类型映射为逻辑流向
+类型映射 = {"转入资金": "流入", "卖出股票": "流入", "转出资金": "流出", "买入股票": "流出"}
+
+# 根据逻辑完善金额、币种字段
+for idx, row in edited_df.iterrows():
+    if row["类型"] in 类型映射:
+        edited_df.at[idx, "逻辑类型"] = 类型映射[row["类型"]]
+for idx, row in edited_df.iterrows():
+    # 自动设置金额 = 股数 * 买入价格（仅限流出）
+    if edited_df.at[idx, "逻辑类型"] == "流出" and pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
+    elif edited_df.at[idx, "逻辑类型"] == "流入" and row["类型"] == "卖出股票" and pd.isna(row["金额"]):
+        if pd.notna(row["股数"]) and pd.notna(row["买入价格"]):
+            edited_df.at[idx, "金额"] = row["股数"] * row["买入价格"]
+    # 自动设置币种 = 市场（港股→HKD, 美股→USD, A股→RMB）
+    if pd.isna(row["币种"]) and pd.notna(row["市场"]):
+        if row["市场"] == "港股":
+            edited_df.at[idx, "币种"] = "HKD"
+        elif row["市场"] == "美股":
+            edited_df.at[idx, "币种"] = "USD"
+        elif row["市场"] == "A股":
+            edited_df.at[idx, "币种"] = "RMB"
+    # 自动修正金额符号（流入为正，流出为负）
+    if pd.notna(row["金额"]):
+        amt = abs(row["金额"])
+        if row["类型"] == "流出":
+            edited_df.at[idx, "金额"] = -amt
+        elif edited_df.at[idx, "逻辑类型"] == "流入":
+            edited_df.at[idx, "金额"] = amt
+
 # 校验股数
-incomplete_rows = edited_df[(edited_df["类型"] == "流出") & ((edited_df["股数"].isna()) | (edited_df["股数"] == 0))]
+incomplete_rows = edited_df[(edited_df["逻辑类型"] == "流出") & ((edited_df["股数"].isna()) | (edited_df["股数"] == 0))]
 if not incomplete_rows.empty:
     st.error("⚠️ 有投资记录缺少股数，请补全股数后再计算。")
     st.stop()
 
 # 自动生成当前估值记录（使用实时股价 API 或手动输入）
-holdings = edited_df[(edited_df["类型"] == "流出") & (edited_df["股数"] > 0)]
+holdings = edited_df[(edited_df["逻辑类型"] == "流出") & (edited_df["股数"] > 0)]
 
 if not holdings.empty:
     st.markdown("---")
@@ -177,7 +229,7 @@ def calculate_xirr(cash_flows):
 if not edited_df.empty:
     net_positions = edited_df.copy()
     net_positions = net_positions[net_positions["股票代码"].notna() & net_positions["股数"].notna()]
-    net_positions["方向"] = net_positions["类型"].apply(lambda x: 1 if x == "流入" else -1)
+    net_positions["方向"] = net_positions["逻辑类型"].apply(lambda x: 1 if x == "流入" else -1)
     net_positions["调整股数"] = net_positions["股数"] * net_positions["方向"]
     stock_summary = net_positions.groupby(["股票代码", "市场"])["调整股数"].sum().reset_index().rename(columns={"调整股数": "当前持仓"})
 
@@ -211,7 +263,7 @@ if st.button("📊 计算 MWR（按不同币种）"):
             cf_df_sorted = cf_df.sort_values("日期")
             cash_flows = []
             for _, row in cf_df_sorted.iterrows():
-                amt = abs(row["金额转换"]) if row["类型"] == "流入" else -abs(row["金额转换"])
+                amt = abs(row["金额转换"]) if row["逻辑类型"] == "流入" else -abs(row["金额转换"])
                 cash_flows.append((row["日期"], amt))
             result = calculate_xirr(cash_flows)
             mwr_results[ccy] = result
