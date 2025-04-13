@@ -73,6 +73,14 @@ def update_cashflow_df(df):
                     df.at[idx, "汇率"] = rate
 
         # 自动补金额
+        try:
+            price = float(row["价格"])
+            qty = float(row["股数"])
+            rate = float(row["汇率"])
+            df.at[idx, "金额"] = price * qty * rate
+        except Exception as e:
+            st.warning(f"第 {idx+1} 行金额计算失败，错误信息：{e}")
+
         if pd.notna(row["价格"]) and pd.notna(row["股数"]) and pd.notna(row["汇率"]):
             df.at[idx, "金额"] = row["价格"] * row["股数"] * row["汇率"]
     return df        
