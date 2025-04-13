@@ -76,7 +76,7 @@ def update_cashflow_df(df):
         if pd.notna(row["价格"]) and pd.notna(row["股数"]) and pd.notna(row["汇率"]):
             df.at[idx, "金额"] = row["价格"] * row["股数"] * row["汇率"]
     return df        
-   
+  
     
     
 
@@ -100,8 +100,13 @@ edited_df = st.data_editor(
 )
 
  
+st.markdown("📌 如修改了汇率或价格，请点击下方按钮以重新计算金额。")
 
-
-# 自动更新逻辑
-edited_df = update_cashflow_df(edited_df)
-st.session_state.cashflow_df = edited_df
+# 按钮 + 自动逻辑（避免重复）
+if st.button("🔄 重新计算金额"):
+    updated_df = update_cashflow_df(edited_df.copy())
+    st.session_state.cashflow_df = updated_df
+    st.experimental_rerun()
+else:
+    edited_df = update_cashflow_df(edited_df)
+    st.session_state.cashflow_df = edited_df
