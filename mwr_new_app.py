@@ -118,12 +118,17 @@ edited_df = st.data_editor(
 
 st.markdown("📌 如修改了汇率或价格，请点击下方按钮以重新计算金额。")
 
-# ✅ 刷新按钮 + 自动逻辑
+
+    
 if st.button("🔄 重新计算金额"):
-    updated_df = update_cashflow_df(edited_df.copy())
+    updated_df = edited_df.copy()
+
+    # ✅ 清空币种变化后的汇率
+    for idx, row in updated_df.iterrows():
+        if pd.notna(row["币种"]) and pd.notna(row["目标币种"]) and row["币种"] != row["目标币种"]:
+            updated_df.at[idx, "汇率"] = None  # 强制重新抓汇率
+
+    updated_df = update_cashflow_df(updated_df)
     st.session_state.cashflow_df = updated_df
-    st.success("✅ 金额已重新计算，请查看上方表格。")
-else:
-    edited_df = update_cashflow_df(edited_df)
-    st.session_state.cashflow_df = edited_df
+    st.success("✅ 金额和汇率已重新计算，请查看上方表格。")
 
